@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+.DS_Store
+.idea/
+.vscode/
+
+# Never commit Home Assistant runtime data or research captures.
+.storage/
+secrets.yaml
+*.log
+*.pcap
+*.pcapng
+*.apk
+*.zip
+*authcode*
+*token*
+*secret*

@@ -1,0 +1,12 @@
+{
+  "domain": "huawei_hilink_opple",
+  "name": "Huawei HiLink Opple Light",
+  "codeowners": ["@0xlic"],
+  "config_flow": true,
+  "documentation": "https://github.com/0xlic/ha-huawei-hilink-opple",
+  "issue_tracker": "https://github.com/0xlic/ha-huawei-hilink-opple/issues",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "requirements": [],
+  "version": "0.1.1"
+}

@@ -1,0 +1,29 @@
+{
+  "title": "华为 HiLink 欧普吸顶灯",
+  "config": {
+    "step": {
+      "user": {
+        "title": "添加华为 HiLink 欧普吸顶灯",
+        "description": "通过局域网直接连接灯具。authCode 只保存在 Home Assistant 中，不会发送给第三方。",
+        "data": {
+          "name": "名称",
+          "host": "IP 地址",
+          "device_id": "华为设备 ID",
+          "auth_code": "本地 authCode",
+          "model": "型号"
+        },
+        "data_description": {
+          "host": "添加前请先在路由器中为灯具固定此 IP。",
+          "auth_code": "从华为智慧生活取得的十六进制本地控制密钥。"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "无法通过局域网读取灯具状态。",
+      "invalid_auth": "灯具拒绝了此本地 authCode。"
+    },
+    "abort": {
+      "already_configured": "这盏灯已经配置。"
+    }
+  }
+}
