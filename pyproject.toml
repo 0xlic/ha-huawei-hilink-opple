@@ -5,6 +5,9 @@ description = "Local Home Assistant control for Huawei HiLink Opple ceiling ligh
 requires-python = ">=3.11"
 dependencies = ["cryptography>=41"]
 
+[project.optional-dependencies]
+credential-web = ["playwright>=1.46"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

@@ -27,7 +27,20 @@
 2. 华为设备 ID；
 3. 与该设备对应的本地 `authCode`。
 
-请只使用自己拥有或获授权管理的设备与账号。`device ID` 和 `authCode` 都应按凭据处理，不要提交到 Git、Issue、聊天记录或公开日志。该仓库不包含凭据提取工具，也不包含任何真实设备数据。
+请只使用自己拥有或获授权管理的设备与账号。`device ID` 和 `authCode` 都应按凭据处理，不要提交到 Git、Issue、聊天记录或公开日志。仓库提供一个本地凭据助手，但不包含任何真实账号、令牌或设备数据。
+
+## 获取 device ID 和 authCode
+
+推荐使用仓库内的本地 Web 助手。它不依赖手机上的智慧生活 App：在桌面浏览器打开华为官方授权页，用户自行登录后，工具自动读取账号下可用于本地控制的灯具，并在仅限本机访问的页面中显示 HA 所需配置。
+
+```bash
+python3.11 -m venv .venv-credential
+source .venv-credential/bin/activate
+python -m pip install 'cryptography>=41' 'playwright>=1.46'
+python -m tools.credential_web --browser-channel chrome
+```
+
+完整安装、授权、只读 IP 匹配、Android 网络中继和灾难恢复过程见[凭据获取手册](docs/CREDENTIAL_ACQUISITION.md)。这是对智慧生活现有行为的非官方兼容实现，可能随华为服务变化。
 
 ## 安装
 
@@ -71,12 +84,13 @@ custom_components/huawei_hilink_opple
 更详细的过程见：
 
 - [研究与实现过程](docs/RESEARCH.md)
+- [凭据获取与恢复手册](docs/CREDENTIAL_ACQUISITION.md)
 - [协议说明](docs/PROTOCOL.md)
 - [安全与隐私](docs/SECURITY.md)
 
 ## 已知限制
 
-- 本集成无法自动发现灯具，也不会自动取得 `device ID` 或 `authCode`；
+- HA 集成本身不会联网取得凭据；一次性本地 Web 助手可在用户授权后查询；
 - 仅验证了上面列出的华为智选欧普型号；
 - 华为或欧普后续固件可能改变协议行为；
 - Home Assistant 配置条目会保存本地控制凭据，应保护 `/config/.storage` 和备份文件。
@@ -84,9 +98,9 @@ custom_components/huawei_hilink_opple
 ## 开发检查
 
 ```bash
-python -m compileall -q custom_components tests
+python -m compileall -q custom_components tests tools
 python -m pytest
-ruff check custom_components tests
+ruff check custom_components tests tools
 ```
 
 ## 声明
