@@ -2,28 +2,31 @@
   "title": "Huawei HiLink Opple Light",
   "config": {
     "step": {
-      "user": {
-        "title": "Add a Huawei HiLink Opple light",
-        "description": "Connect directly to the light over the local network. The auth code remains in Home Assistant and is never sent to third parties.",
-        "data": {
-          "name": "Name",
-          "host": "IP address",
-          "device_id": "Huawei device ID",
-          "auth_code": "Local auth code",
-          "model": "Model"
-        },
-        "data_description": {
-          "host": "Reserve this IP address in your router before adding the light.",
-          "auth_code": "Hexadecimal local-control key obtained from Huawei Smart Life."
-        }
+      "credentials": {
+        "title": "Import Huawei device credentials",
+        "description": "Run the local credential helper, copy its JSON, and paste the complete JSON below. Only device ID, local auth code, model, and name are retained in Home Assistant memory for 10 minutes.",
+        "data": {"credentials_json": "Credential JSON"},
+        "data_description": {"credentials_json": "Paste the complete JSON copied from the credential helper."}
+      },
+      "local": {
+        "title": "Match a light on the local network",
+        "description": "There are {count} unused credential records in the temporary cache. Enter a reserved IP address; Home Assistant will read the device state with each candidate and use the one that succeeds.",
+        "data": {"name": "Name", "host": "IP address", "clear_cached_credentials": "Clear temporary credentials and return to JSON import"},
+        "data_description": {"host": "Reserve this IP address for the light in your router.", "clear_cached_credentials": "Select this and submit to immediately erase the in-memory cache."}
+      },
+      "manual": {
+        "title": "Manually add one light",
+        "description": "Connect directly using one known device ID and auth code.",
+        "data": {"name": "Name", "host": "IP address", "device_id": "Huawei device ID", "auth_code": "Local auth code", "model": "Model"}
       }
     },
     "error": {
       "cannot_connect": "Could not read the light over the local network.",
-      "invalid_auth": "The light rejected this local auth code."
+      "invalid_auth": "The light rejected this local auth code.",
+      "invalid_credentials_json": "The JSON does not contain valid device ID and auth code records.",
+      "name_and_host_required": "Enter a name and IP address, or select the clear option.",
+      "credentials_not_matched": "No unused credential could read this IP. Check the IP and Home Assistant network access."
     },
-    "abort": {
-      "already_configured": "This light is already configured."
-    }
+    "abort": {"already_configured": "This light is already configured.", "no_new_devices": "Every device in this credential set is already configured."}
   }
 }

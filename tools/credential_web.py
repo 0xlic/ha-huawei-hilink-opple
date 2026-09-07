@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import ipaddress
 import json
 import secrets
 import threading
@@ -23,7 +22,6 @@ from tools.fetch_huawei_credentials import (
     build_authorization_url,
     fetch_credentials,
 )
-from tools.match_hilink_credentials import build_client
 
 PAGE = """<!doctype html>
 <html lang="zh-CN">
@@ -35,9 +33,8 @@ PAGE = """<!doctype html>
     :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
     body { max-width: 920px; margin: 48px auto; padding: 0 20px; line-height: 1.55; }
     .card { border: 1px solid #8886; border-radius: 14px; padding: 20px; margin: 18px 0; }
-    button, input { padding: 10px 15px; margin: 4px 8px 4px 0; }
+    button { padding: 10px 15px; margin: 4px 8px 4px 0; }
     button { cursor: pointer; }
-    input { min-width: min(520px, 80vw); }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td { border-bottom: 1px solid #8885; padding: 9px; text-align: left; }
     code { overflow-wrap: anywhere; }
@@ -58,13 +55,12 @@ PAGE = """<!doctype html>
       账号基础资料、智慧生活设备与技能。完成后可关闭弹出的授权浏览器。</p>
   </div>
   <section id="results" class="card" hidden>
-    <h2>Home Assistant 需要填写的内容</h2>
-    <p>从路由器复制灯具 IP，用空格或逗号分隔。匹配过程只读取状态，不控制灯。</p>
-    <input id="hosts" autocomplete="off" placeholder="例如：192.168.x.10 192.168.x.11">
-    <button id="match">只读匹配 IP</button>
+    <h2>复制到 Home Assistant</h2>
+    <p>点击“复制 JSON”，然后粘贴到集成的凭据输入框。
+       IP 匹配会由家中局域网里的 Home Assistant 完成。</p>
     <table>
       <thead>
-        <tr><th>名称</th><th>IP</th><th>型号</th><th>device ID</th><th>authCode</th></tr>
+        <tr><th>名称</th><th>型号</th><th>device ID</th><th>authCode</th></tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
@@ -89,7 +85,6 @@ PAGE = """<!doctype html>
         const tr = document.createElement('tr');
         for (const value of [
           device.name || `灯 ${index + 1}`,
-          device.host || '待匹配',
           device.model || '未知',
           device.device_id,
           device.auth_code,
@@ -109,14 +104,6 @@ PAGE = """<!doctype html>
     });
     document.querySelector('#clear').addEventListener('click', async () => {
       render(await api('api/clear', {method: 'POST'}));
-    });
-    document.querySelector('#match').addEventListener('click', async () => {
-      const hosts = document.querySelector('#hosts').value.split(/[\\s,，;；]+/).filter(Boolean);
-      render(await api('api/match', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({hosts}),
-      }));
     });
     document.querySelector('#copy').addEventListener('click', async () => {
       await navigator.clipboard.writeText(JSON.stringify({devices: latestDevices}, null, 2));
@@ -313,47 +300,11 @@ def authorization_worker(
         )
 
 
-def match_worker(
-    state: CredentialState,
-    hosts: list[str],
-    *,
-    generation: int,
-    adb_serial: str | None,
-    adb_path: str,
-) -> None:
-    """Read state to prove each host/credential pairing without controlling a lamp."""
-    devices = state.snapshot()["devices"]
-    matched = 0
-    used_indices = {index for index, device in enumerate(devices) if device.get("host")}
-    for host in hosts:
-        for index, device in enumerate(devices):
-            if index in used_indices:
-                continue
-            try:
-                client = build_client(host, device, 2.5, adb_serial, adb_path)
-                client.create_session()
-                client.read_state()
-            except Exception:
-                continue
-            device["host"] = host
-            used_indices.add(index)
-            matched += 1
-            break
-    state.update_if_current(
-        generation,
-        "ready",
-        f"只读匹配完成：本次匹配 {matched} 台，共 {len(used_indices)}/{len(devices)} 台已有 IP",
-        devices,
-    )
-
-
 def make_handler(
     state: CredentialState,
     route_secret: str,
     browser_channel: str | None,
     timeout_seconds: int,
-    adb_serial: str | None,
-    adb_path: str,
 ) -> type[BaseHTTPRequestHandler]:
     """Create a request handler bound to one unguessable local route."""
     prefix = f"/{route_secret}/"
@@ -402,7 +353,7 @@ def make_handler(
             path = urllib.parse.urlparse(self.path).path
             if path == f"{prefix}api/start":
                 current = state.snapshot()["status"]
-                if current in {"opening", "authorizing", "fetching", "matching"}:
+                if current in {"opening", "authorizing", "fetching"}:
                     self.send_json(state.snapshot(), HTTPStatus.CONFLICT)
                     return
                 generation = state.begin("opening", "正在启动独立的授权浏览器", [])
@@ -413,42 +364,6 @@ def make_handler(
                         "generation": generation,
                         "browser_channel": browser_channel,
                         "timeout_seconds": timeout_seconds,
-                    },
-                    daemon=True,
-                )
-                thread.start()
-                self.send_json(state.snapshot())
-                return
-            if path == f"{prefix}api/match":
-                current = state.snapshot()
-                if current["status"] != "ready" or not current["devices"]:
-                    self.send_json(current, HTTPStatus.CONFLICT)
-                    return
-                try:
-                    length = int(self.headers.get("Content-Length", "0"))
-                    if not 0 <= length <= 4096:
-                        raise ValueError
-                    payload = json.loads(self.rfile.read(length).decode())
-                    raw_hosts = payload.get("hosts") if isinstance(payload, dict) else None
-                    if not isinstance(raw_hosts, list):
-                        raise ValueError
-                    hosts = list(
-                        dict.fromkeys(str(ipaddress.IPv4Address(host)) for host in raw_hosts)
-                    )
-                except (UnicodeDecodeError, ValueError, json.JSONDecodeError):
-                    self.send_json(current, HTTPStatus.BAD_REQUEST)
-                    return
-                generation = state.begin(
-                    "matching", "正在执行只读 IP 与凭据匹配", current["devices"]
-                )
-                thread = threading.Thread(
-                    target=match_worker,
-                    kwargs={
-                        "state": state,
-                        "hosts": hosts,
-                        "generation": generation,
-                        "adb_serial": adb_serial,
-                        "adb_path": adb_path,
                     },
                     daemon=True,
                 )
@@ -476,10 +391,6 @@ def parse_args() -> argparse.Namespace:
         help="use an installed Chrome/Edge instead of Playwright Chromium",
     )
     parser.add_argument("--timeout", type=int, default=600, help="authorization timeout in seconds")
-    parser.add_argument(
-        "--adb-serial", help="optional Android wireless-debug serial for IP matching"
-    )
-    parser.add_argument("--adb-path", default="adb")
     parser.add_argument("--no-open", action="store_true", help="do not open the local UI")
     return parser.parse_args()
 
@@ -494,8 +405,6 @@ def main() -> int:
         route_secret,
         args.browser_channel,
         args.timeout,
-        args.adb_serial,
-        args.adb_path,
     )
     server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
     url = f"http://127.0.0.1:{server.server_port}/{route_secret}/"

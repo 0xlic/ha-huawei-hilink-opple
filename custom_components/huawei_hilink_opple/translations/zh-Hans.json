@@ -2,28 +2,31 @@
   "title": "华为 HiLink 欧普吸顶灯",
   "config": {
     "step": {
-      "user": {
-        "title": "添加华为 HiLink 欧普吸顶灯",
-        "description": "通过局域网直接连接灯具。authCode 只保存在 Home Assistant 中，不会发送给第三方。",
-        "data": {
-          "name": "名称",
-          "host": "IP 地址",
-          "device_id": "华为设备 ID",
-          "auth_code": "本地 authCode",
-          "model": "型号"
-        },
-        "data_description": {
-          "host": "添加前请先在路由器中为灯具固定此 IP。",
-          "auth_code": "从华为智慧生活取得的十六进制本地控制密钥。"
-        }
+      "credentials": {
+        "title": "导入华为设备凭据",
+        "description": "运行本地凭据助手，复制 JSON，并把完整内容粘贴到下方。Home Assistant 只提取设备 ID、本地 authCode、型号和名称，在运行内存中缓存 10 分钟。",
+        "data": {"credentials_json": "凭据 JSON"},
+        "data_description": {"credentials_json": "粘贴凭据助手复制的完整 JSON。"}
+      },
+      "local": {
+        "title": "匹配局域网灯具",
+        "description": "临时缓存中还有 {count} 条未添加的凭据。输入灯具的固定 IP，Home Assistant 会使用每条候选凭据只读状态，并采用验证成功的一条。",
+        "data": {"name": "名称", "host": "IP 地址", "clear_cached_credentials": "清除临时凭据并返回 JSON 导入"},
+        "data_description": {"host": "建议先在路由器中为灯具保留此 IP。", "clear_cached_credentials": "勾选并提交后，立即清除内存缓存。"}
+      },
+      "manual": {
+        "title": "手动添加单盏灯",
+        "description": "使用已知的设备 ID 和 authCode 直接连接。",
+        "data": {"name": "名称", "host": "IP 地址", "device_id": "华为设备 ID", "auth_code": "本地 authCode", "model": "型号"}
       }
     },
     "error": {
       "cannot_connect": "无法通过局域网读取灯具状态。",
-      "invalid_auth": "灯具拒绝了此本地 authCode。"
+      "invalid_auth": "灯具拒绝了此本地 authCode。",
+      "invalid_credentials_json": "JSON 中没有有效的设备 ID 和 authCode 记录。",
+      "name_and_host_required": "请输入名称和 IP；若要清除缓存，请勾选清除项后提交。",
+      "credentials_not_matched": "没有未添加的凭据可以读取这个 IP。请检查 IP 和 Home Assistant 的局域网访问。"
     },
-    "abort": {
-      "already_configured": "这盏灯已经配置。"
-    }
+    "abort": {"already_configured": "这盏灯已经配置。", "no_new_devices": "这批凭据中的设备都已经添加。"}
   }
 }

@@ -40,7 +40,7 @@ python -m pip install 'cryptography>=41' 'playwright>=1.46'
 python -m tools.credential_web --browser-channel chrome
 ```
 
-完整安装、授权、只读 IP 匹配、Android 网络中继和灾难恢复过程见[凭据获取手册](docs/CREDENTIAL_ACQUISITION.md)。这是对智慧生活现有行为的非官方兼容实现，可能随华为服务变化。
+完整安装和授权过程见[凭据获取手册](docs/CREDENTIAL_ACQUISITION.md)。助手只取得并复制整批 JSON；局域网 IP 匹配由 Home Assistant 完成，因此电脑可以在外网运行。这是对智慧生活现有行为的非官方兼容实现，可能随华为服务变化。
 
 ## 安装
 
@@ -62,13 +62,13 @@ custom_components/huawei_hilink_opple
 
 ### 添加灯具
 
-1. 打开 **设置 → 设备与服务**；
-2. 点击 **添加集成**；
-3. 搜索 **Huawei HiLink Opple Light**；
-4. 输入名称、固定 IP、设备 ID、本地 `authCode` 和型号；
-5. 集成会先建立本地会话并执行一次只读状态请求，验证成功后才保存配置。
+1. 在电脑上运行本地凭据助手，完成华为官方授权后点击“复制 JSON”；
+2. 打开 **设置 → 设备与服务 → 添加集成**；
+3. 搜索 **Huawei HiLink Opple Light**，粘贴完整 JSON；
+4. 输入灯具名称和固定 IP；
+5. HA 在家中局域网依次只读验证候选凭据，自动保存匹配成功的一条。
 
-每盏灯重复一次以上步骤。设备 ID 被用作唯一标识；如果同一设备已经存在，再次添加只会更新它的 IP。
+整批凭据在 HA 内存中缓存 10 分钟。继续添加集成会直接进入名称和 IP 表单；已添加的设备会自动排除。可在该表单勾选清除项并提交，立即删除缓存并返回 JSON 粘贴页。
 
 ## 网络要求
 
@@ -90,7 +90,7 @@ custom_components/huawei_hilink_opple
 
 ## 已知限制
 
-- HA 集成本身不会联网取得凭据；一次性本地 Web 助手可在用户授权后查询；
+- HA 集成本身不会连接华为云；本地 Web 助手查询凭据，HA 只在局域网完成 IP 匹配；
 - 仅验证了上面列出的华为智选欧普型号；
 - 华为或欧普后续固件可能改变协议行为；
 - Home Assistant 配置条目会保存本地控制凭据，应保护 `/config/.storage` 和备份文件。

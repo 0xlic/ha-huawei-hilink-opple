@@ -6,7 +6,7 @@ import urllib.parse
 
 import pytest
 
-from tools.credential_web import CredentialState
+from tools.credential_web import PAGE, CredentialState
 from tools.fetch_huawei_credentials import (
     SCOPES,
     authorization_code_from_input,
@@ -92,3 +92,9 @@ def test_clear_invalidates_in_flight_web_result() -> None:
 
     assert accepted is False
     assert state.snapshot()["devices"] == []
+
+
+def test_web_helper_only_exports_credentials() -> None:
+    assert "复制 JSON" in PAGE
+    assert "api/match" not in PAGE
+    assert "只读匹配 IP" not in PAGE
