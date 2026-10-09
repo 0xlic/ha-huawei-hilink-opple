@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 COAP_PORT = 5686
+DEFAULT_REQUEST_TIMEOUT = 3.5
 CONTENT_FORMAT_JSON = 50
 OPT_URI_PATH = 11
 OPT_CONTENT_FORMAT = 12
@@ -238,7 +239,7 @@ class HiLinkLegacyClient:
         auth_code: str,
         *,
         port: int = COAP_PORT,
-        timeout: float = 3.5,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> None:
         self.host = host
         self.port = port

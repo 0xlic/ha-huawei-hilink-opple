@@ -13,8 +13,19 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .client import HiLinkError, HiLinkLegacyClient, LightState
-from .const import CONF_AUTH_CODE, CONF_DEVICE_ID, DEFAULT_POLL_INTERVAL, DOMAIN
+from .client import (
+    DEFAULT_REQUEST_TIMEOUT,
+    HiLinkError,
+    HiLinkLegacyClient,
+    LightState,
+)
+from .const import (
+    CONF_AUTH_CODE,
+    CONF_DEVICE_ID,
+    DEFAULT_POLL_INTERVAL,
+    DOMAIN,
+    FAST_REFRESH_TIMEOUT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,11 +45,14 @@ class HiLinkCoordinator(DataUpdateCoordinator[LightState]):
         self._lock = asyncio.Lock()
         self._client: HiLinkLegacyClient | None = None
 
-    def _new_client(self) -> HiLinkLegacyClient:
+    def _new_client(
+        self, *, timeout: float = DEFAULT_REQUEST_TIMEOUT
+    ) -> HiLinkLegacyClient:
         return HiLinkLegacyClient(
             self.entry.data[CONF_HOST],
             self.entry.data[CONF_DEVICE_ID],
             self.entry.data[CONF_AUTH_CODE],
+            timeout=timeout,
         )
 
     def _sync_read(self) -> LightState:
@@ -54,12 +68,39 @@ class HiLinkCoordinator(DataUpdateCoordinator[LightState]):
                 self._client = None
         raise last_error or HiLinkError("State read failed")
 
+    def _sync_fast_read(self) -> LightState:
+        """Read once with a fresh session and a short recovery timeout."""
+        self._client = self._new_client(timeout=FAST_REFRESH_TIMEOUT)
+        try:
+            self._client.create_session()
+            state = self._client.read_state()
+        except HiLinkError:
+            self._client = None
+            raise
+        self._client.timeout = DEFAULT_REQUEST_TIMEOUT
+        return state
+
     async def _async_update_data(self) -> LightState:
         async with self._lock:
             try:
                 return await self.hass.async_add_executor_job(self._sync_read)
             except HiLinkError as exc:
                 raise UpdateFailed(str(exc)) from exc
+
+    async def async_force_refresh(self) -> None:
+        """Explicitly refresh through a new, short-timeout local session."""
+        error: UpdateFailed | None = None
+        state: LightState | None = None
+        async with self._lock:
+            try:
+                state = await self.hass.async_add_executor_job(self._sync_fast_read)
+            except HiLinkError as exc:
+                error = UpdateFailed(str(exc))
+        if error is not None:
+            self.async_set_update_error(error)
+            return
+        if state is not None:
+            self.async_set_updated_data(state)
 
     def _sync_commands(self, commands: list[tuple[str, dict[str, Any]]]) -> LightState:
         last_error: Exception | None = None

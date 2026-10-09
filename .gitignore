@@ -8,6 +8,7 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+.pi/
 
 # Never commit Home Assistant runtime data or research captures.
 .storage/

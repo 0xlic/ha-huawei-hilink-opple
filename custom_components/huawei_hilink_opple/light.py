@@ -64,6 +64,10 @@ class HuaweiHiLinkOppleLight(CoordinatorEntity[HiLinkCoordinator], LightEntity):
             model=entry.data.get(CONF_MODEL),
         )
 
+    async def async_update(self) -> None:
+        """Force a fresh short-timeout session for explicit HA refreshes."""
+        await self.coordinator.async_force_refresh()
+
     @property
     def is_on(self) -> bool:
         """Return whether the light is on."""

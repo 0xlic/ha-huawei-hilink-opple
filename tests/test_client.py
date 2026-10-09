@@ -21,6 +21,17 @@ sys.modules[SPEC.name] = CLIENT
 SPEC.loader.exec_module(CLIENT)
 
 
+def test_client_request_timeout_can_be_shortened_for_recovery() -> None:
+    """Recovery reads can use a short timeout without changing the normal default."""
+    normal = CLIENT.HiLinkLegacyClient("192.0.2.1", "device", "00")
+    recovery = CLIENT.HiLinkLegacyClient(
+        "192.0.2.1", "device", "00", timeout=1.0
+    )
+
+    assert normal.timeout == CLIENT.DEFAULT_REQUEST_TIMEOUT == 3.5
+    assert recovery.timeout == 1.0
+
+
 def test_coap_round_trip_with_extended_options() -> None:
     """High-numbered vendor options survive CoAP encoding and parsing."""
     token = b"abc"
