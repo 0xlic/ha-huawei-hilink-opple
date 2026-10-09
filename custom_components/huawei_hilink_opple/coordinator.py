@@ -25,6 +25,7 @@ from .const import (
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     FAST_REFRESH_TIMEOUT,
+    RECOVERY_WINDOW_SECONDS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,6 +45,14 @@ class HiLinkCoordinator(DataUpdateCoordinator[LightState]):
         self.entry = entry
         self._lock = asyncio.Lock()
         self._client: HiLinkLegacyClient | None = None
+        self._recovery_until = 0.0
+
+    def _start_recovery(self) -> None:
+        """Extend this lamp's recovery window before waiting for the device lock."""
+        self._recovery_until = time.monotonic() + RECOVERY_WINDOW_SECONDS
+
+    def _in_recovery(self) -> bool:
+        return time.monotonic() < self._recovery_until
 
     def _new_client(
         self, *, timeout: float = DEFAULT_REQUEST_TIMEOUT
@@ -56,16 +65,28 @@ class HiLinkCoordinator(DataUpdateCoordinator[LightState]):
         )
 
     def _sync_read(self) -> LightState:
+        # Select the policy in the worker, after acquiring the device lock. A
+        # refresh can open the recovery window while this poll is queued.
+        if self._in_recovery():
+            return self._sync_fast_read()
         last_error: Exception | None = None
         for _attempt in range(2):
             try:
                 if self._client is None:
                     self._client = self._new_client()
                     self._client.create_session()
-                return self._client.read_state()
+                if self._in_recovery():
+                    self._client.timeout = FAST_REFRESH_TIMEOUT
+                state = self._client.read_state()
+                self._client.timeout = DEFAULT_REQUEST_TIMEOUT
+                return state
             except HiLinkError as exc:
                 last_error = exc
                 self._client = None
+                # An in-flight socket read cannot be safely interrupted. If a
+                # refresh arrived meanwhile, do not add another long attempt.
+                if self._in_recovery():
+                    break
         raise last_error or HiLinkError("State read failed")
 
     def _sync_fast_read(self) -> LightState:
@@ -83,12 +104,15 @@ class HiLinkCoordinator(DataUpdateCoordinator[LightState]):
     async def _async_update_data(self) -> LightState:
         async with self._lock:
             try:
-                return await self.hass.async_add_executor_job(self._sync_read)
+                state = await self.hass.async_add_executor_job(self._sync_read)
             except HiLinkError as exc:
                 raise UpdateFailed(str(exc)) from exc
+            self._recovery_until = 0.0
+            return state
 
     async def async_force_refresh(self) -> None:
-        """Explicitly refresh through a new, short-timeout local session."""
+        """Open recovery immediately and explicitly read through a new session."""
+        self._start_recovery()
         error: UpdateFailed | None = None
         state: LightState | None = None
         async with self._lock:
@@ -96,6 +120,8 @@ class HiLinkCoordinator(DataUpdateCoordinator[LightState]):
                 state = await self.hass.async_add_executor_job(self._sync_fast_read)
             except HiLinkError as exc:
                 error = UpdateFailed(str(exc))
+            else:
+                self._recovery_until = 0.0
         if error is not None:
             self.async_set_update_error(error)
             return
@@ -133,4 +159,5 @@ class HiLinkCoordinator(DataUpdateCoordinator[LightState]):
                 state = await self.hass.async_add_executor_job(self._sync_commands, commands)
             except HiLinkError as exc:
                 raise UpdateFailed(str(exc)) from exc
+            self._recovery_until = 0.0
         self.async_set_updated_data(state)
