@@ -69,19 +69,22 @@ class HuaweiHiLinkOppleLight(CoordinatorEntity[HiLinkCoordinator], LightEntity):
         await self.coordinator.async_force_refresh()
 
     @property
-    def is_on(self) -> bool:
-        """Return whether the light is on."""
-        return self.coordinator.data.is_on
+    def is_on(self) -> bool | None:
+        """Return whether the light is on, if any state has been received."""
+        state = self.coordinator.data
+        return state.is_on if state is not None else None
 
     @property
-    def brightness(self) -> int:
-        """Return brightness in Home Assistant's 1..255 scale."""
-        return max(1, round(self.coordinator.data.brightness * 255 / 100))
+    def brightness(self) -> int | None:
+        """Return brightness in Home Assistant's 1..255 scale, when known."""
+        state = self.coordinator.data
+        return max(1, round(state.brightness * 255 / 100)) if state is not None else None
 
     @property
-    def color_temp_kelvin(self) -> int:
-        """Return the current color temperature in kelvin."""
-        return self.coordinator.data.color_temp_kelvin
+    def color_temp_kelvin(self) -> int | None:
+        """Return the current color temperature in kelvin, when known."""
+        state = self.coordinator.data
+        return state.color_temp_kelvin if state is not None else None
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on and apply optional brightness/color temperature."""

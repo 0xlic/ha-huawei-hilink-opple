@@ -12,7 +12,10 @@ from .coordinator import HiLinkCoordinator
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a Huawei HiLink Opple light from a config entry."""
     coordinator = HiLinkCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
+    # A lamp may be physically unpowered during HA startup. A failed normal
+    # refresh marks it unavailable but must not prevent its entity from loading;
+    # registered entities can recover through polling or update_entity later.
+    await coordinator.async_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
